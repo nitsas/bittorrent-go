@@ -9,31 +9,37 @@ import (
 	// bencode "github.com/jackpal/bencode-go" // Available if you need it!
 )
 
-// Example:
-// - 5:hello -> hello
-// - 10:hello12345 -> hello12345
+// Examples:
+// - "5:hello" -> "hello"
 func decodeBencode(bencodedString string) (interface{}, error) {
 	if unicode.IsDigit(rune(bencodedString[0])) {
-		var firstColonIndex int
-
-		for i := 0; i < len(bencodedString); i++ {
-			if bencodedString[i] == ':' {
-				firstColonIndex = i
-				break
-			}
-		}
-
-		lengthStr := bencodedString[:firstColonIndex]
-
-		length, err := strconv.Atoi(lengthStr)
-		if err != nil {
-			return "", err
-		}
-
-		return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], nil
+		return decodeBencString(bencodedString)
 	} else {
-		return "", fmt.Errorf("Only strings are supported at the moment")
+		return "", fmt.Errorf("Only strings and integers are supported at the moment")
 	}
+}
+
+// Example:
+// - "5:hello" -> "hello"
+// - "10:hello12345" -> "hello12345"
+func decodeBencString(bencodedString string) (string, error) {
+	var firstColonIndex int
+
+	for i := 0; i < len(bencodedString); i++ {
+		if bencodedString[i] == ':' {
+			firstColonIndex = i
+			break
+		}
+	}
+
+	lengthStr := bencodedString[:firstColonIndex]
+
+	length, err := strconv.Atoi(lengthStr)
+	if err != nil {
+		return "", err
+	}
+
+	return bencodedString[firstColonIndex+1 : firstColonIndex+1+length], nil
 }
 
 func main() {
