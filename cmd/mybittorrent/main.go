@@ -25,9 +25,41 @@ func decodeNextBencToken(bencData string) (interface{}, uint, error) {
 		return decodeBencInt(bencData)
 	} else if rune(bencData[0]) == 'l' {
 		return decodeBencList(bencData)
+	} else if rune(bencData[0]) == 'd' {
+		return decodeBencDict(bencData)
 	} else {
 		return "", 0, fmt.Errorf("Unrecognized type")
 	}
+}
+
+// Examples:
+// - "de" -> {}
+// - "d3:foo3:bar5:helloi52ee" -> {"foo": "bar", "hello": 52}
+func decodeBencDict(bencData string) (map[string]interface{}, uint, error) {
+	result := make(map[string]interface{})
+	i := 1
+	for bencData[i] != 'e' && i < len(bencData) {
+		key, skipIndex, err := decodeBencString(bencData[i:])
+		if err != nil {
+			return map[string]interface{}{}, 0, err
+		}
+		i += int(skipIndex)
+
+		val, skipIndex, err := decodeNextBencToken(bencData[i:])
+		if err != nil {
+			return map[string]interface{}{}, 0, err
+		}
+
+		i += int(skipIndex)
+		result[key] = val
+	}
+
+	if i >= len(bencData) {
+		err := fmt.Errorf("Bencoded dict '%s' missing trailing 'e'", bencData)
+		return map[string]interface{}{}, 0, err
+	}
+
+	return result, uint(i + 1), nil
 }
 
 // Examples:
