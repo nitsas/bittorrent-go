@@ -12,6 +12,7 @@ import (
 // - "0:" -> ""
 // - "5:hello" -> "hello"
 // - "i52e" -> 52
+// - "l5:helloi52ee" -> ["hello", 52]
 func decodeBencode(bencData string) (interface{}, error) {
 	token, _, error := decodeNextBencToken(bencData[0:])
 	return token, error
@@ -22,9 +23,34 @@ func decodeNextBencToken(bencData string) (interface{}, uint, error) {
 		return decodeBencString(bencData)
 	} else if rune(bencData[0]) == 'i' {
 		return decodeBencInt(bencData)
+	} else if rune(bencData[0]) == 'l' {
+		return decodeBencList(bencData)
 	} else {
 		return "", 0, fmt.Errorf("Unrecognized type")
 	}
+}
+
+// Examples:
+// - "le" -> []
+// - "l5:helloi52ee" -> ["hello", 52]
+// - "lli4eei5ee" -> [[4], 5]
+func decodeBencList(bencData string) ([]interface{}, uint, error) {
+	result := make([]interface{}, 0)
+	i := uint(1)
+	for bencData[i] != 'e' {
+		token, nextIndex, err := decodeNextBencToken(bencData[i:])
+		if err != nil {
+			return []interface{}{}, 0, err
+		}
+		i += nextIndex
+		result = append(result, token)
+	}
+	if bencData[i] != 'e' {
+		err := fmt.Errorf("Bencoded list '%s' missing trailing 'e'", bencData)
+		return []interface{}{}, 0, err
+	}
+
+	return result, i + 1, nil
 }
 
 // Example:
