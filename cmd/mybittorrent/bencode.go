@@ -1,25 +1,36 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+)
 
 func bencode(obj interface{}) (result string) {
-	switch t := obj.(type) {
+	switch tobj := obj.(type) {
 	case int:
-		result = fmt.Sprintf("i%de", t)
+		result = fmt.Sprintf("i%de", tobj)
 	case string:
-		result = fmt.Sprintf("%d:%s", len(t), t)
+		result = fmt.Sprintf("%d:%s", len(tobj), tobj)
 	case map[string]interface{}:
 		result = "d"
-		for key, val := range t {
-			result += bencode(key) + bencode(val)
+		mapKeys := make([]string, 0, len(tobj))
+		for key := range tobj {
+			mapKeys = append(mapKeys, key)
+		}
+		sort.Strings(mapKeys)
+		for _, key := range mapKeys {
+			result += bencode(key) + bencode(tobj[key])
 		}
 		result += "e"
 	case []interface{}:
 		result = "l"
-		for _, elem := range t {
+		for _, elem := range tobj {
 			result += bencode(elem)
 		}
 		result += "e"
+	default:
+		err := fmt.Errorf("Unrecognized type (%T) of %#v\n", tobj, tobj)
+		panic(err)
 	}
 
 	return result

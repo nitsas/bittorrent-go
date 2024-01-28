@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha1"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -139,6 +140,29 @@ func decodeBencInt(bencData string) (int, uint, error) {
 	}
 }
 
+func parseTorrent(filename string) (map[string]interface{}, error) {
+	data, err := os.ReadFile(filename)
+	panicIf(err)
+	torrContent := string(data)
+	torrDict, _, err := decodeBencDict(torrContent)
+
+	return torrDict, err
+}
+
+func cmdInfo(filename string) (string, int, string, error) {
+	torrDict, err := parseTorrent(filename)
+	if err != nil {
+		return "", 0, "", err
+	}
+
+	url := torrDict["announce"].(string)
+	info := torrDict["info"].(map[string]interface{})
+	length := info["length"].(int)
+	infoHash := sha1.Sum([]byte(bencode(info)))
+
+	return url, length, string(infoHash[:]), nil
+}
+
 func panicIf(err error) {
 	if err != nil {
 		panic(err)
@@ -157,17 +181,9 @@ func main() {
 		jsonOutput, _ := json.Marshal(decoded)
 		fmt.Println(string(jsonOutput))
 	} else if command == "info" {
-		filename := os.Args[2]
-		data, err := os.ReadFile(filename)
+		url, length, infoHash, err := cmdInfo(os.Args[2])
 		panicIf(err)
-		torrContent := string(data)
-
-		torrInfo, _, err := decodeBencDict(torrContent)
-		panicIf(err)
-		url := torrInfo["announce"].(string)
-		info := torrInfo["info"].(map[string]interface{})
-		length := info["length"].(int)
-		fmt.Printf("Tracker URL: %s\nLength: %d\n", url, length)
+		fmt.Printf("Tracker URL: %s\nLength: %d\nInfo Hash: %x\n", url, length, infoHash)
 	} else {
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
