@@ -139,6 +139,12 @@ func decodeBencInt(bencData string) (int, uint, error) {
 	}
 }
 
+func panicIf(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
+
 func main() {
 	command := os.Args[1]
 
@@ -146,12 +152,22 @@ func main() {
 		bencodedValue := os.Args[2]
 
 		decoded, err := decodeBencode(bencodedValue)
-		if err != nil {
-			panic(err)
-		}
+		panicIf(err)
 
 		jsonOutput, _ := json.Marshal(decoded)
 		fmt.Println(string(jsonOutput))
+	} else if command == "info" {
+		filename := os.Args[2]
+		data, err := os.ReadFile(filename)
+		panicIf(err)
+		torrContent := string(data)
+
+		torrInfo, _, err := decodeBencDict(torrContent)
+		panicIf(err)
+		url := torrInfo["announce"].(string)
+		info := torrInfo["info"].(map[string]interface{})
+		length := info["length"].(int)
+		fmt.Printf("Tracker URL: %s\nLength: %d\n", url, length)
 	} else {
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
