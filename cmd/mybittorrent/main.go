@@ -158,7 +158,7 @@ func cmdInfo(filename string) (string, int, string, error) {
 	url := torrDict["announce"].(string)
 	info := torrDict["info"].(map[string]interface{})
 	length := info["length"].(int)
-	infoHash := sha1.Sum([]byte(bencode(info)))
+	infoHash := sha1.Sum([]byte(Bencode(info)))
 
 	return url, length, string(infoHash[:]), nil
 }

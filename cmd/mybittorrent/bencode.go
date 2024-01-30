@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-func bencode(obj interface{}) (result string) {
+func Bencode(obj interface{}) (result string) {
 	switch tobj := obj.(type) {
 	case int:
 		result = fmt.Sprintf("i%de", tobj)
@@ -19,13 +19,13 @@ func bencode(obj interface{}) (result string) {
 		}
 		sort.Strings(mapKeys)
 		for _, key := range mapKeys {
-			result += bencode(key) + bencode(tobj[key])
+			result += Bencode(key) + Bencode(tobj[key])
 		}
 		result += "e"
 	case []interface{}:
 		result = "l"
 		for _, elem := range tobj {
-			result += bencode(elem)
+			result += Bencode(elem)
 		}
 		result += "e"
 	default:
