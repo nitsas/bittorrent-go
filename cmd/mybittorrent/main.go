@@ -15,7 +15,8 @@ func panicIf(err error) {
 func main() {
 	command := os.Args[1]
 
-	if command == "decode" {
+	switch command {
+	case "decode":
 		bencodedValue := os.Args[2]
 
 		decoded, err := DecodeBencode(bencodedValue)
@@ -23,7 +24,7 @@ func main() {
 
 		jsonOutput, _ := json.Marshal(decoded)
 		fmt.Println(string(jsonOutput))
-	} else if command == "info" {
+	case "info":
 		t, infoHash, err := ParseTorrent(os.Args[2])
 		panicIf(err)
 		fmt.Printf("Tracker URL: %s\n", t.announce)
@@ -34,7 +35,7 @@ func main() {
 		for _, p := range t.info.pieces {
 			fmt.Printf("%x\n", p)
 		}
-	} else {
+	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
 	}
