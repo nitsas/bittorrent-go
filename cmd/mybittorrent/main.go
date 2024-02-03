@@ -7,27 +7,38 @@ import (
 	"os"
 )
 
-func parseTorrent(filename string) (map[string]interface{}, error) {
-	data, err := os.ReadFile(filename)
-	panicIf(err)
-	torrContent := string(data)
-	torrDict, err := DecodeBencode(torrContent)
-
-	return torrDict.(map[string]interface{}), err
+type torrent struct {
+	announce string
+	info     torrentInfo
 }
 
-func cmdInfo(filename string) (string, int, string, error) {
-	torrDict, err := parseTorrent(filename)
+type torrentInfo struct {
+	length      int
+	name        string
+}
+
+func parseTorrent(filename string) (*torrent, string, error) {
+	data, err := os.ReadFile(filename)
 	if err != nil {
-		return "", 0, "", err
+		return nil, "", err
+	}
+	torrContent := string(data)
+
+	torrDecoded, err := DecodeBencode(torrContent)
+	torrDict := torrDecoded.(map[string]interface{})
+	infoDict := torrDict["info"].(map[string]interface{})
+	infoHashBytes := sha1.Sum([]byte(Bencode(infoDict)))
+	infoHash := string(infoHashBytes[:])
+
+	t := torrent{
+		announce: torrDict["announce"].(string),
+		info: torrentInfo{
+			length:      infoDict["length"].(int),
+			name:        infoDict["name"].(string),
+		},
 	}
 
-	url := torrDict["announce"].(string)
-	info := torrDict["info"].(map[string]interface{})
-	length := info["length"].(int)
-	infoHash := sha1.Sum([]byte(Bencode(info)))
-
-	return url, length, string(infoHash[:]), nil
+	return &t, infoHash, nil
 }
 
 func panicIf(err error) {
@@ -48,9 +59,11 @@ func main() {
 		jsonOutput, _ := json.Marshal(decoded)
 		fmt.Println(string(jsonOutput))
 	} else if command == "info" {
-		url, length, infoHash, err := cmdInfo(os.Args[2])
+		t, infoHash, err := parseTorrent(os.Args[2])
 		panicIf(err)
-		fmt.Printf("Tracker URL: %s\nLength: %d\nInfo Hash: %x\n", url, length, infoHash)
+		fmt.Printf("Tracker URL: %s\n", t.announce)
+		fmt.Printf("Length: %d\n", t.info.length)
+		fmt.Printf("Info Hash: %x\n", infoHash)
 	} else {
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
