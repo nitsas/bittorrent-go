@@ -69,6 +69,38 @@ func main() {
 			port := binary.BigEndian.Uint16(peersBytes[i+4 : i+6])
 			fmt.Printf("%s:%d\n", ip, port)
 		}
+	case "handshake":
+		// ipPort := strings.Split(os.Args[2], ":")
+		// ip := ipPort[0]
+		// port := ipPort[1]
+		// fmt.Printf("%s:%s\n", ip, port)
+
+		torrName := os.Args[2]
+		peerIpPort := os.Args[3]
+
+		_, infoHash, err := ParseTorrent(torrName)
+		panicIf(err)
+
+		handshake := make([]byte, 0, 68)
+		handshake = append(handshake, byte(19))
+		handshake = append(handshake, []byte("BitTorrent protocol")...)
+		handshake = append(handshake, make([]byte, 8)...)
+		handshake = append(handshake, infoHash...)
+		handshake = append(handshake, []byte(PeerId)...)
+
+		conn, err := net.Dial("tcp", peerIpPort)
+		panicIf(err)
+		defer conn.Close()
+
+		_, err = conn.Write(handshake)
+		panicIf(err)
+
+		handshakeResp := make([]byte, 1000)
+		_, err = conn.Read(handshakeResp)
+		if err != nil && err != io.EOF {
+			panic(err)
+		}
+		fmt.Printf("Peer ID: %x\n", handshakeResp[48:68])
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
