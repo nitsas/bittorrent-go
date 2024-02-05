@@ -9,6 +9,8 @@ import (
 	"os"
 )
 
+const PeerId = "c20e54494e34aa21c2af"
+
 func panicIf(err error) {
 	if err != nil {
 		panic(err)
@@ -39,8 +41,7 @@ func main() {
 			fmt.Printf("%x\n", p)
 		}
 	case "peers":
-		peerId := "c20e54494e34aa21c2af"
-		resp, err := TorrentRequest(os.Args[2], peerId)
+		resp, err := TorrentRequest(os.Args[2], PeerId)
 		panicIf(err)
 		defer resp.Body.Close()
 
