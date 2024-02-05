@@ -19,7 +19,7 @@ func TorrentRequest(filename string, peerId string) (*http.Response, error) {
 	}
 
 	params := url.Values{}
-	params.Add("info_hash", infoHash)
+	params.Add("info_hash", string(infoHash))
 	params.Add("peer_id", peerId)
 	params.Add("port", "6881")
 	params.Add("uploaded", "0")

@@ -5,18 +5,17 @@ import (
 	"os"
 )
 
-func ParseTorrent(filename string) (*torrent, string, error) {
+func ParseTorrent(filename string) (*torrent, []byte, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, "", err
+		return nil, nil, err
 	}
 	torrContent := string(data)
 
 	torrDecoded, err := DecodeBencode(torrContent)
 	torrDict := torrDecoded.(map[string]interface{})
 	infoDict := torrDict["info"].(map[string]interface{})
-	infoHashBytes := sha1.Sum([]byte(Bencode(infoDict)))
-	infoHash := string(infoHashBytes[:])
+	infoHash := sha1.Sum([]byte(Bencode(infoDict)))
 	piecesString := infoDict["pieces"].(string)
 	pieces := make([]string, len(piecesString)/20)
 	for i := 0; i < len(piecesString); i += 20 {
@@ -33,5 +32,5 @@ func ParseTorrent(filename string) (*torrent, string, error) {
 		},
 	}
 
-	return &t, infoHash, nil
+	return &t, infoHash[:], nil
 }
