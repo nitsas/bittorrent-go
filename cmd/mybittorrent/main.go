@@ -70,29 +70,17 @@ func main() {
 			fmt.Printf("%s:%d\n", ip, port)
 		}
 	case "handshake":
-		// ipPort := strings.Split(os.Args[2], ":")
-		// ip := ipPort[0]
-		// port := ipPort[1]
-		// fmt.Printf("%s:%s\n", ip, port)
-
 		torrName := os.Args[2]
 		peerIpPort := os.Args[3]
 
 		_, infoHash, err := ParseTorrent(torrName)
 		panicIf(err)
 
-		handshake := make([]byte, 0, 68)
-		handshake = append(handshake, byte(19))
-		handshake = append(handshake, []byte("BitTorrent protocol")...)
-		handshake = append(handshake, make([]byte, 8)...)
-		handshake = append(handshake, infoHash...)
-		handshake = append(handshake, []byte(PeerId)...)
-
 		conn, err := net.Dial("tcp", peerIpPort)
 		panicIf(err)
 		defer conn.Close()
 
-		_, err = conn.Write(handshake)
+		err = writeHandshake(conn, infoHash)
 		panicIf(err)
 
 		handshakeResp := make([]byte, 1000)
