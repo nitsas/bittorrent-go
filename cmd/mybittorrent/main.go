@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,33 +40,13 @@ func main() {
 			fmt.Printf("%x\n", p)
 		}
 	case "peers":
-		resp, err := TrackerRequest(os.Args[2], PeerId)
+		torrFile := os.Args[2]
+		torr, infoHash, err := ParseTorrent(torrFile)
 		panicIf(err)
-		defer resp.Body.Close()
-
-		respBodyBytes, err := io.ReadAll(resp.Body)
+		trackerResp, err := TrackerRequest(torr, infoHash, PeerId)
 		panicIf(err)
-
-		respString := string(respBodyBytes)
-		respDecoded, err := DecodeBencode(respString)
-		panicIf(err)
-		respMap, ok := respDecoded.(map[string]interface{})
-		if !ok {
-			panic("Unexpected type in decoded response.")
-		}
-		// interval := respMap["interval"].(int)
-		// if !ok {
-		// 	panic("Unexpected type in key 'interval'.")
-		// }
-		peersStr := respMap["peers"].(string)
-		if !ok {
-			panic("Unexpected type in key 'peers'.")
-		}
-		peersBytes := []byte(peersStr)
-		for i := 0; i < len(peersBytes); i += 6 {
-			ip := net.IP(peersBytes[i : i+4])
-			port := binary.BigEndian.Uint16(peersBytes[i+4 : i+6])
-			fmt.Printf("%s:%d\n", ip, port)
+		for _, peer := range trackerResp.Peers {
+			fmt.Printf("%s:%d\n", peer.Ip, peer.Port)
 		}
 	case "handshake":
 		torrName := os.Args[2]
