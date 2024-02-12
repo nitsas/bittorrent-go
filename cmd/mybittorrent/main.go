@@ -41,7 +41,7 @@ func main() {
 			fmt.Printf("%x\n", p)
 		}
 	case "peers":
-		resp, err := TorrentRequest(os.Args[2], PeerId)
+		resp, err := TrackerRequest(os.Args[2], PeerId)
 		panicIf(err)
 		defer resp.Body.Close()
 

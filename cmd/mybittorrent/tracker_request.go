@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-func TorrentRequest(filename string, peerId string) (*http.Response, error) {
+func TrackerRequest(filename string, peerId string) (*http.Response, error) {
 	t, infoHash, err := ParseTorrent(os.Args[2])
 	if err != nil {
 		return nil, err
