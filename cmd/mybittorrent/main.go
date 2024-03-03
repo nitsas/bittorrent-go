@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"os"
 )
@@ -62,12 +61,9 @@ func main() {
 		err = writeHandshake(conn, infoHash)
 		panicIf(err)
 
-		handshakeResp := make([]byte, 1000)
-		_, err = conn.Read(handshakeResp)
-		if err != nil && err != io.EOF {
-			panic(err)
-		}
-		fmt.Printf("Peer ID: %x\n", handshakeResp[48:68])
+		peerId, err := readHandshake(conn)
+		panicIf(err)
+		fmt.Printf("Peer ID: %x\n", peerId)
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
