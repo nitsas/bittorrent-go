@@ -6,6 +6,16 @@ import (
 	"net"
 )
 
+func handshake(conn net.Conn, infoHash []byte) ([]byte, error) {
+	err := writeHandshake(conn, infoHash)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	peerId, err := readHandshake(conn)
+	return peerId, err
+}
+
 func writeHandshake(conn net.Conn, infoHash []byte) error {
 	hs := make([]byte, 0, 68)
 	hs = append(hs, byte(19))
