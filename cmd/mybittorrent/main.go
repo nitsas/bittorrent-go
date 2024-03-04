@@ -64,6 +64,30 @@ func main() {
 		peerId, err := readHandshake(conn)
 		panicIf(err)
 		fmt.Printf("Peer ID: %x\n", peerId)
+	case "download_piece":
+		// outFile := os.Args[3]
+		torrFile := os.Args[4]
+		// pieceNum := os.Args[5]
+
+		torr, infoHash, err := ParseTorrent(torrFile)
+		panicIf(err)
+
+		trackerResp, err := TrackerRequest(torr, infoHash, PeerId)
+		panicIf(err)
+
+		peer := trackerResp.Peers[0]
+		peerIpPort := fmt.Sprintf("%s:%d", peer.Ip, peer.Port)
+
+		conn, err := net.Dial("tcp", peerIpPort)
+		panicIf(err)
+		defer conn.Close()
+
+		_, err = handshake(conn, infoHash)
+		panicIf(err)
+
+		peerMsg, err := readPeerMessage(conn)
+		panicIf(err)
+		fmt.Printf("Read peer msg with id %d and payload size %d\n", peerMsg.id, len(peerMsg.payload))
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
