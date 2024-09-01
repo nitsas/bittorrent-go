@@ -85,9 +85,26 @@ func main() {
 		_, err = handshake(conn, infoHash)
 		panicIf(err)
 
+		fmt.Printf("Waiting for 'bitfield' msg from the peer...\n")
 		peerMsg, err := readPeerMessage(conn)
 		panicIf(err)
-		fmt.Printf("Read peer msg with id %d and payload size %d\n", peerMsg.id, len(peerMsg.payload))
+		fmt.Printf("Read peer msg with id %d, payload: %#v\n", peerMsg.id, peerMsg.payload)
+
+		interestedMsg := PeerMessage{pmidInterested, []byte{}}
+		err = sendPeerMessage(conn, interestedMsg)
+		panicIf(err)
+		fmt.Printf("Sent 'interested' msg to the peer!\n")
+
+		peerMsg = PeerMessage{pmidChoke, []byte{}}
+		for peerMsg.id != pmidUnchoke {
+			fmt.Printf("Waiting for 'unchoke' msg from the peer...\n")
+			peerMsg, err = readPeerMessage(conn)
+			panicIf(err)
+			fmt.Printf("Read peer msg with id: %d, payload: %#v\n", peerMsg.id, peerMsg.payload)
+		}
+
+		fmt.Printf("TODO: Send 'request' messages for each 16kiB block of the piece\n")
+		fmt.Printf("TODO: Wait for 'piece' messages for each block that we requested\n")
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)

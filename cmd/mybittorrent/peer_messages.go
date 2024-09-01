@@ -2,27 +2,32 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
+type pmid uint8
+
 type PeerMessage struct {
-	id      uint8
+	id      pmid
 	payload []byte
 }
 
-// Message IDs:
-// 0: choke
-// 1: unchoke
-// 2: interested
-// 3: not interested
-// 4: have
-// 5: bitfield
-// 6: request
-// 7: piece
-// 8: cancel
+const (
+	pmidChoke         pmid = 0
+	pmidUnchoke       pmid = 1
+	pmidInterested    pmid = 2
+	pmidNotInterested pmid = 3
+	pmidHave          pmid = 4
+	pmidBitfield      pmid = 5
+	pmidRequest       pmid = 6
+	pmidPiece         pmid = 7
+	pmidCancel        pmid = 8
+)
 
 func readPeerMessage(reader io.Reader) (PeerMessage, error) {
 	msgLen := uint32(0)
+
 	for msgLen == 0 {
 		msgLenBytes := make([]byte, 4)
 		_, err := io.ReadFull(reader, msgLenBytes)
@@ -30,23 +35,31 @@ func readPeerMessage(reader io.Reader) (PeerMessage, error) {
 			return PeerMessage{}, err
 		}
 		msgLen = binary.BigEndian.Uint32(msgLenBytes)
-		// if msgLen is 0, it's a keepalive message - just ignore it
+		// If msgLen is 0, it's a keepalive message, and we should ignore it.
 	}
 
-	msgIdBytes := make([]byte, 1)
-	_, err := io.ReadFull(reader, msgIdBytes)
+	msgPayloadBytes := make([]byte, msgLen)
+	_, err := io.ReadFull(reader, msgPayloadBytes)
 	if err != nil {
 		return PeerMessage{}, err
 	}
-	msgId := uint8(msgIdBytes[0])
+	msgId := pmid(msgPayloadBytes[0])
 
-	msgPayload := make([]byte, msgLen)
-	_, err = reader.Read(msgPayload)
-	if err != nil {
-		return PeerMessage{}, err
-	}
-
-	peerMsg := PeerMessage{msgId, msgPayload}
+	peerMsg := PeerMessage{msgId, msgPayloadBytes[1:]}
 
 	return peerMsg, nil
+}
+
+func sendPeerMessage(writer io.Writer, msg PeerMessage) error {
+	msgBytes := make([]byte, 4, 5+len(msg.payload))
+	binary.BigEndian.PutUint32(msgBytes[0:4], uint32(1+len(msg.payload)))
+	msgBytes = append(msgBytes, byte(msg.id))
+	msgBytes = append(msgBytes, msg.payload...)
+
+	bytesWritten, err := writer.Write(msgBytes)
+	if err == nil && bytesWritten < len(msgBytes) {
+		err = fmt.Errorf("sendPeerMessage: wrote %d bytes instead of %d", bytesWritten, len(msgBytes))
+	}
+
+	return err
 }
