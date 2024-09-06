@@ -51,14 +51,22 @@ func readPeerMessage(reader io.Reader) (PeerMessage, error) {
 }
 
 func sendPeerMessage(writer io.Writer, msg PeerMessage) error {
-	msgBytes := make([]byte, 4, 5+len(msg.payload))
-	binary.BigEndian.PutUint32(msgBytes[0:4], uint32(1+len(msg.payload)))
-	msgBytes = append(msgBytes, byte(msg.id))
-	msgBytes = append(msgBytes, msg.payload...)
+	msgLenBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(msgLenBytes, uint32(1+len(msg.payload)))
 
-	bytesWritten, err := writer.Write(msgBytes)
-	if err == nil && bytesWritten < len(msgBytes) {
-		err = fmt.Errorf("sendPeerMessage: wrote %d bytes instead of %d", bytesWritten, len(msgBytes))
+	bytesWritten, err := writer.Write(msgLenBytes)
+	if err == nil && bytesWritten < len(msgLenBytes) {
+		err = fmt.Errorf("sendPeerMessage: wrote %d bytes instead of %d", bytesWritten, len(msgLenBytes))
+	}
+
+	bytesWritten, err = writer.Write([]byte{byte(msg.id)})
+	if err == nil && bytesWritten < 1 {
+		err = fmt.Errorf("sendPeerMessage: wrote %d bytes instead of %d", bytesWritten, 1)
+	}
+
+	bytesWritten, err = writer.Write(msg.payload)
+	if err == nil && bytesWritten < len(msg.payload) {
+		err = fmt.Errorf("sendPeerMessage: wrote %d bytes instead of %d", bytesWritten, len(msg.payload))
 	}
 
 	return err
