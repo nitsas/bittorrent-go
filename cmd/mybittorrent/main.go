@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 )
 
 const PeerId = "c20e54494e34aa21c2af"
@@ -65,12 +67,23 @@ func main() {
 		panicIf(err)
 		fmt.Printf("Peer ID: %x\n", peerId)
 	case "download_piece":
+		usageString := fmt.Sprintf("Usage: %s download_piece -o <output-filepath> <torrent-filepath> <piece-number>", os.Args[0])
+		if len(os.Args) < 6 || os.Args[2] != "-o" {
+			panic(usageString)
+		}
+
 		// outFile := os.Args[3]
 		torrFile := os.Args[4]
-		// pieceNum := os.Args[5]
+		pieceIndex, err := strconv.Atoi(os.Args[5])
+		panicIf(err)
 
 		torr, infoHash, err := ParseTorrent(torrFile)
 		panicIf(err)
+
+		numPieces := len(torr.info.pieces)
+		if pieceIndex < 0 || pieceIndex > numPieces {
+			panic(fmt.Sprintf("Torrent %s has %d pieces, so <piece-number> can be between 0 and %d", torrFile, numPieces, numPieces-1))
+		}
 
 		trackerResp, err := TrackerRequest(torr, infoHash, PeerId)
 		panicIf(err)
@@ -103,8 +116,56 @@ func main() {
 			fmt.Printf("Read peer msg with id: %d, payload: %#v\n", peerMsg.id, peerMsg.payload)
 		}
 
-		fmt.Printf("TODO: Send 'request' messages for each 16kiB block of the piece\n")
-		fmt.Printf("TODO: Wait for 'piece' messages for each block that we requested\n")
+		torrLength := torr.info.length
+		pieceLength := torr.info.pieceLength
+		if pieceIndex == numPieces-1 {
+			// last piece may be shorter than the others
+			pieceLength = torrLength % pieceLength
+		}
+
+		const BlockSize = 16 * 1024
+
+		fmt.Printf("Sending 'request' messages to peer:\n")
+		numBlocks := 0
+		for blockBegin := 0; blockBegin < pieceLength; blockBegin += BlockSize {
+			numBlocks += 1
+
+			blockLength := pieceLength - blockBegin
+			if BlockSize < blockLength {
+				blockLength = BlockSize
+			}
+
+			requestPayload := make([]byte, 12)
+			binary.BigEndian.PutUint32(requestPayload[0:4], uint32(pieceIndex))
+			binary.BigEndian.PutUint32(requestPayload[4:8], uint32(blockBegin))
+			binary.BigEndian.PutUint32(requestPayload[8:12], uint32(blockLength))
+
+			requestMsg := PeerMessage{pmidRequest, requestPayload}
+			err = sendPeerMessage(conn, requestMsg)
+			panicIf(err)
+			fmt.Printf("- Sent 'request' msg to peer: piece: %d, blockBegin: %d, requestPayload: %#v\n", pieceIndex, blockBegin, requestPayload)
+		}
+
+		fmt.Printf("Listening for 'piece' messages from peer:\n")
+		blockMessages := make([]PeerMessage, 0, numBlocks)
+		for len(blockMessages) < numBlocks {
+			peerMsg, err = readPeerMessage(conn)
+			panicIf(err)
+
+			if peerMsg.id != 7 {
+				fmt.Printf("- Read (and ignored) peer msg with id %d, payload: %#v\n", peerMsg.id, peerMsg.payload)
+				continue
+			}
+
+			pieceIndex := binary.BigEndian.Uint32(peerMsg.payload[0:4])
+			blockBegin := binary.BigEndian.Uint32(peerMsg.payload[4:8])
+			blockData := peerMsg.payload[8:]
+			fmt.Printf("- Read 'piece' peer msg, pieceIndex: %d, blockBegin: %d, len(blockData): %d\n", pieceIndex, blockBegin, len(blockData))
+
+			blockMessages = append(blockMessages, peerMsg)
+		}
+
+		fmt.Printf("TODO: Connect the data from received 'piece' messages and store them to disk.\n")
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
