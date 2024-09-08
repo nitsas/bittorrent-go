@@ -1,11 +1,13 @@
 package main
 
 import (
+	"crypto/sha1"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 )
 
@@ -72,17 +74,17 @@ func main() {
 			panic(usageString)
 		}
 
-		// outFile := os.Args[3]
-		torrFile := os.Args[4]
+		outFilepath := os.Args[3]
+		torrFilepath := os.Args[4]
 		pieceIndex, err := strconv.Atoi(os.Args[5])
 		panicIf(err)
 
-		torr, infoHash, err := ParseTorrent(torrFile)
+		torr, infoHash, err := ParseTorrent(torrFilepath)
 		panicIf(err)
 
 		numPieces := len(torr.info.pieces)
-		if pieceIndex < 0 || pieceIndex > numPieces {
-			panic(fmt.Sprintf("Torrent %s has %d pieces, so <piece-number> can be between 0 and %d", torrFile, numPieces, numPieces-1))
+		if pieceIndex < 0 || pieceIndex >= numPieces {
+			panic(fmt.Sprintf("Torrent %s has %d pieces, so <piece-number> can be between 0 and %d", torrFilepath, numPieces, numPieces-1))
 		}
 
 		trackerResp, err := TrackerRequest(torr, infoHash, PeerId)
@@ -101,7 +103,7 @@ func main() {
 		fmt.Printf("Waiting for 'bitfield' msg from the peer...\n")
 		peerMsg, err := readPeerMessage(conn)
 		panicIf(err)
-		fmt.Printf("Read peer msg with id %d, payload: %#v\n", peerMsg.id, peerMsg.payload)
+		fmt.Printf("Read peer msg with id %d, payload: %x\n", peerMsg.id, peerMsg.payload)
 
 		interestedMsg := PeerMessage{pmidInterested, []byte{}}
 		err = sendPeerMessage(conn, interestedMsg)
@@ -113,7 +115,7 @@ func main() {
 			fmt.Printf("Waiting for 'unchoke' msg from the peer...\n")
 			peerMsg, err = readPeerMessage(conn)
 			panicIf(err)
-			fmt.Printf("Read peer msg with id: %d, payload: %#v\n", peerMsg.id, peerMsg.payload)
+			fmt.Printf("Read peer msg with id: %d, payload: %x\n", peerMsg.id, peerMsg.payload)
 		}
 
 		torrLength := torr.info.length
@@ -127,6 +129,7 @@ func main() {
 
 		fmt.Printf("Sending 'request' messages to peer:\n")
 		numBlocks := 0
+		blocks := make(map[int][]byte)
 		for blockBegin := 0; blockBegin < pieceLength; blockBegin += BlockSize {
 			numBlocks += 1
 
@@ -143,29 +146,63 @@ func main() {
 			requestMsg := PeerMessage{pmidRequest, requestPayload}
 			err = sendPeerMessage(conn, requestMsg)
 			panicIf(err)
-			fmt.Printf("- Sent 'request' msg to peer: piece: %d, blockBegin: %d, requestPayload: %#v\n", pieceIndex, blockBegin, requestPayload)
+			fmt.Printf("- Sent 'request' msg to peer: piece: %d, blockBegin: %d, requestPayload: %x\n",
+				pieceIndex, blockBegin, requestPayload)
 		}
 
 		fmt.Printf("Listening for 'piece' messages from peer:\n")
-		blockMessages := make([]PeerMessage, 0, numBlocks)
-		for len(blockMessages) < numBlocks {
+		for len(blocks) < numBlocks {
 			peerMsg, err = readPeerMessage(conn)
 			panicIf(err)
 
 			if peerMsg.id != 7 {
-				fmt.Printf("- Read (and ignored) peer msg with id %d, payload: %#v\n", peerMsg.id, peerMsg.payload)
+				fmt.Printf("- Read (and ignored) peer msg with id %d, payload: %x\n",
+					peerMsg.id, peerMsg.payload)
 				continue
 			}
 
-			pieceIndex := binary.BigEndian.Uint32(peerMsg.payload[0:4])
-			blockBegin := binary.BigEndian.Uint32(peerMsg.payload[4:8])
+			pieceIndex := int(binary.BigEndian.Uint32(peerMsg.payload[0:4]))
+			blockBegin := int(binary.BigEndian.Uint32(peerMsg.payload[4:8]))
 			blockData := peerMsg.payload[8:]
-			fmt.Printf("- Read 'piece' peer msg, pieceIndex: %d, blockBegin: %d, len(blockData): %d\n", pieceIndex, blockBegin, len(blockData))
+			fmt.Printf("- Read 'piece' peer msg, pieceIndex: %d, blockBegin: %d, len(blockData): %d\n",
+				pieceIndex, blockBegin, len(blockData))
 
-			blockMessages = append(blockMessages, peerMsg)
+			if _, ok := blocks[blockBegin]; !ok {
+				blocks[blockBegin] = blockData
+			}
 		}
 
-		fmt.Printf("TODO: Connect the data from received 'piece' messages and store them to disk.\n")
+		blockBegins := make([]int, 0, len(blocks))
+		for bb := range blocks {
+			blockBegins = append(blockBegins, bb)
+		}
+		sort.Ints(blockBegins)
+
+		piece := make([]byte, 0, pieceLength)
+		for _, bb := range blockBegins {
+			piece = append(piece, blocks[bb]...)
+		}
+
+		pieceHashArray := sha1.Sum(piece)
+		pieceHash := string(pieceHashArray[:])
+		expectedHash := torr.info.pieces[pieceIndex]
+		if pieceHash[:] != expectedHash {
+			panic(fmt.Errorf("Got piece %d with hash %x which differs from expected hash %x!\n",
+				pieceIndex, pieceHash, expectedHash))
+		} else {
+			fmt.Printf("Piece %d matches expected hash %x! :)\n", pieceIndex, expectedHash)
+		}
+
+		outFile, err := os.Create(outFilepath)
+		panicIf(err)
+		defer outFile.Close()
+		fmt.Printf("Opened file %s to write piece %d.\n", outFilepath, pieceIndex)
+
+		n, err := outFile.Write(piece)
+		panicIf(err)
+		fmt.Printf("Wrote piece %d, %d bytes.\n", pieceIndex, n)
+
+		fmt.Printf("Enjoy! :)\n")
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
