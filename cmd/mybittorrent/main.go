@@ -91,9 +91,13 @@ func main() {
 		panicIf(err)
 
 		peer := trackerResp.Peers[0]
-		conn, _, err := ConnectToPeer(peer, infoHash)
+		conn, bitfield, err := ConnectToPeer(peer, infoHash)
 		defer conn.Close()
 		panicIf(err)
+
+		if !bitfield.HasPiece(pieceIndex) {
+			panic(fmt.Sprintf("Peer %#v does NOT have piece %d\n", peer, pieceIndex))
+		}
 
 		interestedMsg := PeerMessage{pmidInterested, []byte{}}
 		err = sendPeerMessage(conn, interestedMsg)
