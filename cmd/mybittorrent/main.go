@@ -91,26 +91,16 @@ func main() {
 		panicIf(err)
 
 		peer := trackerResp.Peers[0]
-		peerIpPort := fmt.Sprintf("%s:%d", peer.Ip, peer.Port)
-
-		conn, err := net.Dial("tcp", peerIpPort)
-		panicIf(err)
+		conn, _, err := ConnectToPeer(peer, infoHash)
 		defer conn.Close()
-
-		_, err = handshake(conn, infoHash)
 		panicIf(err)
-
-		fmt.Printf("Waiting for 'bitfield' msg from the peer...\n")
-		peerMsg, err := readPeerMessage(conn)
-		panicIf(err)
-		fmt.Printf("Read peer msg with id %d, payload: %x\n", peerMsg.id, peerMsg.payload)
 
 		interestedMsg := PeerMessage{pmidInterested, []byte{}}
 		err = sendPeerMessage(conn, interestedMsg)
 		panicIf(err)
 		fmt.Printf("Sent 'interested' msg to the peer!\n")
 
-		peerMsg = PeerMessage{pmidChoke, []byte{}}
+		peerMsg := PeerMessage{pmidChoke, []byte{}}
 		for peerMsg.id != pmidUnchoke {
 			fmt.Printf("Waiting for 'unchoke' msg from the peer...\n")
 			peerMsg, err = readPeerMessage(conn)
