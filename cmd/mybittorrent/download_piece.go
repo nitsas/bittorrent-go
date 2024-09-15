@@ -3,28 +3,34 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	"net"
 	"sort"
 )
 
 type Piece []byte
 
-func DownloadPiece(conn net.Conn, pieceIndex int, pieceLength int) (Piece, error) {
-	interestedMsg := PeerMessage{pmidInterested, []byte{}}
-	err := sendPeerMessage(conn, interestedMsg)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("Sent 'interested' msg to the peer!\n")
-
-	peerMsg := PeerMessage{pmidChoke, []byte{}}
-	for peerMsg.id != pmidUnchoke {
-		fmt.Printf("Waiting for 'unchoke' msg from the peer...\n")
-		peerMsg, err = readPeerMessage(conn)
+func DownloadPiece(peerConn *PeerConn, pieceIndex int, pieceLength int) (Piece, error) {
+	if !peerConn.Interested {
+		interestedMsg := PeerMessage{pmidInterested, []byte{}}
+		err := sendPeerMessage(peerConn.Conn, interestedMsg)
 		if err != nil {
 			return nil, err
 		}
-		fmt.Printf("Read peer msg with id: %d, payload: %x\n", peerMsg.id, peerMsg.payload)
+		fmt.Printf("Sent 'interested' msg to the peer!\n")
+		peerConn.Interested = true
+	}
+
+	if peerConn.Choked {
+		peerMsg := PeerMessage{pmidChoke, []byte{}}
+		for peerMsg.id != pmidUnchoke {
+			var err error
+			fmt.Printf("Waiting for 'unchoke' msg from the peer...\n")
+			peerMsg, err = readPeerMessage(peerConn.Conn)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Printf("Read peer msg with id: %d, payload: %x\n", peerMsg.id, peerMsg.payload)
+		}
+		peerConn.Choked = false
 	}
 
 	const BlockSize = 16 * 1024
@@ -46,7 +52,7 @@ func DownloadPiece(conn net.Conn, pieceIndex int, pieceLength int) (Piece, error
 		binary.BigEndian.PutUint32(requestPayload[8:12], uint32(blockLength))
 
 		requestMsg := PeerMessage{pmidRequest, requestPayload}
-		err = sendPeerMessage(conn, requestMsg)
+		err := sendPeerMessage(peerConn.Conn, requestMsg)
 		if err != nil {
 			return nil, err
 		}
@@ -55,15 +61,16 @@ func DownloadPiece(conn net.Conn, pieceIndex int, pieceLength int) (Piece, error
 	}
 
 	notInterestedMsg := PeerMessage{pmidNotInterested, []byte{}}
-	err = sendPeerMessage(conn, notInterestedMsg)
+	err := sendPeerMessage(peerConn.Conn, notInterestedMsg)
 	if err != nil {
 		return nil, err
 	}
 	fmt.Printf("Sent 'not interested' msg to the peer!\n")
+	peerConn.Interested = false
 
 	fmt.Printf("Listening for 'piece' messages from peer:\n")
 	for len(blocks) < numBlocks {
-		peerMsg, err = readPeerMessage(conn)
+		peerMsg, err := readPeerMessage(peerConn.Conn)
 		if err != nil {
 			return nil, err
 		}

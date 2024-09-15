@@ -107,3 +107,14 @@ Expected output:
 ```
 Piece 0 downloaded to /tmp/test-piece-0.
 ```
+
+### Download a whole torrent
+
+```sh
+./your_bittorrent.sh download -o /tmp/sample.txt sample.torrent
+```
+
+Expected output:
+```
+Downloaded sample.torrent to /tmp/sample.txt.
+```
