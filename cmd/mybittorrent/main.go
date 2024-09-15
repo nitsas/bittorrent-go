@@ -122,11 +122,9 @@ func main() {
 		defer outFile.Close()
 		fmt.Printf("Opened file %s to write piece %d.\n", outFilepath, pieceIndex)
 
-		n, err := outFile.Write(piece)
+		_, err = outFile.Write(piece)
 		panicIf(err)
-		fmt.Printf("Wrote piece %d, %d bytes.\n", pieceIndex, n)
-
-		fmt.Printf("Enjoy! :)\n")
+		fmt.Printf("Piece %d downloaded to %s.\n", pieceIndex, outFilepath)
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)

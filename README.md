@@ -97,7 +97,7 @@ Expected output:
 Peer ID: 0102030405060708090a0b0c0d0e0f1011121314
 ```
 
-### Download a piece (WIP)
+### Download a piece
 
 ```sh
 ./your_bittorrent.sh download_piece -o /tmp/test-piece-0 sample.torrent 0
