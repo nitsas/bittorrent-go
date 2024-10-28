@@ -118,3 +118,15 @@ Expected output:
 ```
 Downloaded sample.torrent to /tmp/sample.txt.
 ```
+
+### Parse magnet link
+
+```sh
+./your_bittorrent.sh magnet_parse 'magnet:?xt=urn:btih:ad42ce8109f54c99613ce38f9b4d87e70f24a165&dn=magnet1.gif&tr=http%3A%2F%2Fbittorrent-test-tracker.codecrafters.io%2Fannounce'
+```
+
+Expected output:
+```
+Tracker URL: http://bittorrent-test-tracker.codecrafters.io/announce
+Info Hash: d69f91e6b2ae4c542468d1073a71d4ea13879a7f
+```

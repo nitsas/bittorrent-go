@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 )
 
 const PeerId = "c20e54494e34aa21c2af"
@@ -187,6 +189,41 @@ func main() {
 		}
 
 		fmt.Printf("Downloaded %s to %s.\n", torrFilepath, outFilepath)
+	case "magnet_parse":
+		usageString := fmt.Sprintf("Usage: %s magnet_parse <magnet-uri>", os.Args[0])
+		if len(os.Args) < 3 {
+			panic(usageString)
+		}
+
+		magnetURI := os.Args[2]
+		u, err := url.Parse(magnetURI)
+		panicIf(err)
+		if u.Scheme != "magnet" {
+			panic(fmt.Errorf("Error: Expected URI scheme to be 'magnet'. Got %s\n", u.Scheme))
+		}
+
+		q, err := url.ParseQuery(u.RawQuery)
+		panicIf(err)
+
+		xt := q["xt"]
+		if len(xt) < 1 {
+			panic("Expected param xt to have at least one value")
+		}
+
+		xtVals := strings.Split(xt[0], ":")
+		if len(xtVals) < 3 || xtVals[0] != "urn" || xtVals[1] != "btih" {
+			panic(fmt.Errorf("Expected xt param to start with 'urn:btih:' - got %s\n", xt[0]))
+		}
+
+		tr := q["tr"]
+		if len(tr) < 1 {
+			panic("Expected param tr to have at least one value")
+		}
+
+		infoHash := xtVals[2]
+		trackerURL := tr[0]
+
+		fmt.Printf("Tracker URL: %s\nInfo Hash: %s\n", trackerURL, infoHash)
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)
