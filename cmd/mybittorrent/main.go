@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -46,7 +47,7 @@ func main() {
 		torrFile := os.Args[2]
 		torr, infoHash, err := ParseTorrent(torrFile)
 		panicIf(err)
-		trackerResp, err := TrackerRequest(torr, infoHash, PeerId)
+		trackerResp, err := TrackerRequest(torr.announce, infoHash, PeerId)
 		panicIf(err)
 		for _, peer := range trackerResp.Peers {
 			fmt.Printf("%s:%d\n", peer.Ip, peer.Port)
@@ -62,7 +63,7 @@ func main() {
 		panicIf(err)
 		defer conn.Close()
 
-		err = writeHandshake(conn, infoHash)
+		err = writeHandshake(conn, infoHash, false)
 		panicIf(err)
 
 		peerId, err := readHandshake(conn)
@@ -87,11 +88,11 @@ func main() {
 			panic(fmt.Sprintf("Torrent %s has %d pieces, so <piece-number> can be between 0 and %d", torrFilepath, numPieces, numPieces-1))
 		}
 
-		trackerResp, err := TrackerRequest(torr, infoHash, PeerId)
+		trackerResp, err := TrackerRequest(torr.announce, infoHash, PeerId)
 		panicIf(err)
 
 		peer := trackerResp.Peers[0]
-		peerConn, bitfield, err := ConnectToPeer(peer, infoHash)
+		peerConn, bitfield, err := ConnectToPeer(peer, infoHash, false)
 		defer peerConn.Close()
 		panicIf(err)
 
@@ -139,11 +140,11 @@ func main() {
 		torr, infoHash, err := ParseTorrent(torrFilepath)
 		panicIf(err)
 
-		trackerResp, err := TrackerRequest(torr, infoHash, PeerId)
+		trackerResp, err := TrackerRequest(torr.announce, infoHash, PeerId)
 		panicIf(err)
 
 		peer := trackerResp.Peers[0]
-		peerConn, bitfield, err := ConnectToPeer(peer, infoHash)
+		peerConn, bitfield, err := ConnectToPeer(peer, infoHash, false)
 		defer peerConn.Close()
 		panicIf(err)
 
@@ -212,7 +213,7 @@ func main() {
 
 		xtVals := strings.Split(xt[0], ":")
 		if len(xtVals) < 3 || xtVals[0] != "urn" || xtVals[1] != "btih" {
-			panic(fmt.Errorf("Expected xt param to start with 'urn:btih:' - got %s\n", xt[0]))
+			panic(fmt.Errorf("Expected param xt to start with 'urn:btih:' - got %s\n", xt[0]))
 		}
 
 		tr := q["tr"]
@@ -224,6 +225,63 @@ func main() {
 		trackerURL := tr[0]
 
 		fmt.Printf("Tracker URL: %s\nInfo Hash: %s\n", trackerURL, infoHash)
+	case "magnet_handshake":
+		usageString := fmt.Sprintf("Usage: %s magnet_handshake <magnet-uri>", os.Args[0])
+		if len(os.Args) < 3 {
+			panic(usageString)
+		}
+
+		magnetURI := os.Args[2]
+		u, err := url.Parse(magnetURI)
+		panicIf(err)
+		if u.Scheme != "magnet" {
+			panic(fmt.Errorf("Error: Expected URI scheme to be 'magnet'. Got %s\n", u.Scheme))
+		}
+
+		q, err := url.ParseQuery(u.RawQuery)
+		panicIf(err)
+
+		xt := q["xt"]
+		if len(xt) < 1 {
+			panic("Expected param xt to have at least one value")
+		}
+
+		xtVals := strings.Split(xt[0], ":")
+		if len(xtVals) < 3 || xtVals[0] != "urn" || xtVals[1] != "btih" {
+			panic(fmt.Errorf("Expected param xt to start with 'urn:btih:' - got %s\n", xt[0]))
+		}
+
+		tr := q["tr"]
+		if len(tr) < 1 {
+			panic("Expected param tr to have at least one value")
+		}
+
+		infoHash := xtVals[2]
+		trackerURL := tr[0]
+
+		infoHashDecoded, err := hex.DecodeString(infoHash)
+		panicIf(err)
+		trackerResp, err := TrackerRequest(trackerURL, infoHashDecoded, PeerId)
+		panicIf(err)
+
+		if len(trackerResp.Peers) < 1 {
+			panic("Expected at least one peer in tracker response")
+		}
+		peer := trackerResp.Peers[0]
+
+		// for _, peer := range trackerResp.Peers {
+		// 	fmt.Printf("%s:%d\n", peer.Ip, peer.Port)
+		// }
+
+		peerIpPort := fmt.Sprintf("%s:%d", peer.Ip, peer.Port)
+		conn, err := net.Dial("tcp", peerIpPort)
+		panicIf(err)
+		defer conn.Close()
+
+		peerId, err := handshake(conn, infoHashDecoded, true)
+		panicIf(err)
+
+		fmt.Printf("Peer ID: %s\n", hex.EncodeToString(peerId))
 	default:
 		fmt.Println("Unknown command: " + command)
 		os.Exit(1)

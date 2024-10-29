@@ -1,13 +1,14 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 )
 
-func handshake(conn net.Conn, infoHash []byte) ([]byte, error) {
-	err := writeHandshake(conn, infoHash)
+func handshake(conn net.Conn, infoHash []byte, extension bool) ([]byte, error) {
+	err := writeHandshake(conn, infoHash, extension)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -16,11 +17,15 @@ func handshake(conn net.Conn, infoHash []byte) ([]byte, error) {
 	return peerId, err
 }
 
-func writeHandshake(conn net.Conn, infoHash []byte) error {
+func writeHandshake(conn net.Conn, infoHash []byte, extension bool) error {
 	hs := make([]byte, 0, 68)
 	hs = append(hs, byte(19))
 	hs = append(hs, []byte("BitTorrent protocol")...)
-	hs = append(hs, make([]byte, 8)...)
+	extensionsBytes := make([]byte, 8)
+	if extension {
+		binary.BigEndian.PutUint64(extensionsBytes, uint64(1)<<20)
+	}
+	hs = append(hs, extensionsBytes...)
 	hs = append(hs, infoHash...)
 	hs = append(hs, []byte(PeerId)...)
 

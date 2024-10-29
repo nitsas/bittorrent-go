@@ -19,7 +19,7 @@ func NewPeerConn(conn net.Conn) PeerConn {
 	return PeerConn{conn, false, true}
 }
 
-func ConnectToPeer(peer Peer, infoHash []byte) (PeerConn, Bitfield, error) {
+func ConnectToPeer(peer Peer, infoHash []byte, extension bool) (PeerConn, Bitfield, error) {
 	peerIpPort := fmt.Sprintf("%s:%d", peer.Ip, peer.Port)
 
 	conn, err := net.Dial("tcp", peerIpPort)
@@ -27,7 +27,7 @@ func ConnectToPeer(peer Peer, infoHash []byte) (PeerConn, Bitfield, error) {
 		return PeerConn{}, nil, err
 	}
 
-	_, err = handshake(conn, infoHash)
+	_, err = handshake(conn, infoHash, extension)
 	if err != nil {
 		return PeerConn{}, nil, err
 	}

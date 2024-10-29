@@ -19,8 +19,8 @@ type Peer struct {
 	Port uint
 }
 
-func TrackerRequest(torr *torrent, infoHash []byte, peerId string) (*TrackerResponse, error) {
-	targetUrl, err := url.Parse(torr.announce)
+func TrackerRequest(trackerURL string, infoHash []byte, peerId string) (*TrackerResponse, error) {
+	targetUrl, err := url.Parse(trackerURL)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func TrackerRequest(torr *torrent, infoHash []byte, peerId string) (*TrackerResp
 	params.Add("port", "6881")
 	params.Add("uploaded", "0")
 	params.Add("downloaded", "0")
-	params.Add("left", fmt.Sprintf("%d", torr.info.length))
+	params.Add("left", fmt.Sprintf("%d", 999))
 	params.Add("compact", "1")
 
 	targetUrl.RawQuery = params.Encode()
