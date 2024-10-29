@@ -19,8 +19,8 @@ type Peer struct {
 	Port uint
 }
 
-func TrackerRequest(torr *torrent, infoHash []byte, peerId string) (*TrackerResponse, error) {
-	targetUrl, err := url.Parse(torr.announce)
+func TrackerRequest(trackerURL string, infoHash []byte, peerId string) (*TrackerResponse, error) {
+	targetUrl, err := url.Parse(trackerURL)
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func TrackerRequest(torr *torrent, infoHash []byte, peerId string) (*TrackerResp
 	params.Add("port", "6881")
 	params.Add("uploaded", "0")
 	params.Add("downloaded", "0")
-	params.Add("left", fmt.Sprintf("%d", torr.info.length))
+	params.Add("left", fmt.Sprintf("%d", 999))
 	params.Add("compact", "1")
 
 	targetUrl.RawQuery = params.Encode()
@@ -63,10 +63,15 @@ func ParseTrackerResponse(resp *http.Response) (*TrackerResponse, error) {
 	if !ok {
 		return nil, fmt.Errorf("Unexpected type in decoded tracker response. Expected map[string]interface{}.")
 	}
-	interval, ok := respMap["interval"].(int)
-	if !ok {
-		return nil, fmt.Errorf("Unexpected type in key 'interval'. Expected int.")
+
+	interval := 0
+	if intervalVal, ok := respMap["interval"]; ok {
+		interval, ok = intervalVal.(int)
+		if !ok {
+			return nil, fmt.Errorf("Unexpected type in key 'interval'. Expected int.")
+		}
 	}
+
 	peersStr, ok := respMap["peers"].(string)
 	if !ok {
 		return nil, fmt.Errorf("Unexpected type in key 'peers'. Expected string.")
